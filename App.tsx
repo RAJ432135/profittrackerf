@@ -6,6 +6,8 @@ import { AppDataProvider } from "./src/context/AppDataContext";
 import { RootNavigator } from "./src/navigation/RootNavigator";
 import { colors } from "./src/theme/theme";
 
+export const API_URL = "https://profittrackerb-production.up.railway.app";
+
 const navTheme = {
   ...DefaultTheme,
   colors: {
