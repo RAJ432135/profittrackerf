@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "Vehicle Profit Tracker",
+    "slug": "vehicle-profit-tracker-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#bfe4fb"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#bfe4fb"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}
