@@ -11,7 +11,7 @@ export const API_URL = "https://profittrackerb-production.up.railway.app";
 const navTheme = {
   ...DefaultTheme,
   colors: {
-    ...DefaultTheme.colors,
+    ...DefaultTheme.colors, 
     background: colors.navyTop,
     card: colors.navyCard,
     text: colors.text,
