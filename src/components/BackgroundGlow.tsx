@@ -9,7 +9,7 @@ import { colors, gradientBackground } from "../theme/theme";
  */
 export function BackgroundGlow() {
   return (
-    <LinearGradient colors={gradientBackground} style={StyleSheet.absoluteFillObject}>
+    <LinearGradient colors={gradientBackground} style={StyleSheet.absoluteFill}>
       <View
         pointerEvents="none"
         style={[styles.blob, { top: -96, left: -96, width: 320, height: 320, backgroundColor: colors.glow, opacity: 0.14 }]}

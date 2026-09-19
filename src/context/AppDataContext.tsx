@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type {
   DashboardSummary,
   Transaction,
@@ -8,6 +8,18 @@ import type {
   Vehicle,
   VehicleType,
 } from "../types/domain";
+import { clearAuth, getAuth, saveAuth } from "../utils/storage";
+import {
+  createTransaction,
+  createVehicle,
+  getDashboardMonth,
+  getDashboardToday,
+  getTransactions,
+  getVehicles,
+  loginUser,
+  logoutUser,
+  registerUser,
+} from "../services/api";
 
 let idSeed = 100;
 const nextId = () => String(idSeed++);
@@ -36,12 +48,13 @@ const seedTransactions: Transaction[] = [
 
 interface AppDataContextValue {
   user: User | null;
-  login: (phone: string) => void;
-  register: (name: string, phone: string) => void;
-  logout: () => void;
+  accessToken: string | null;
+  login: (phone: string, password: string) => Promise<void>;
+  register: (name: string, phone: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
 
   vehicles: Vehicle[];
-  addVehicle: (vehicleNumber: string, vehicleType: VehicleType) => void;
+  addVehicle: (vehicleNumber: string, vehicleType: VehicleType) => Promise<void>;
   updateVehicle: (id: string, vehicleNumber: string, vehicleType: VehicleType) => void;
   removeVehicle: (id: string) => void;
 
@@ -53,7 +66,7 @@ interface AppDataContextValue {
     amount: number;
     date: string;
     note?: string;
-  }) => void;
+  }) => Promise<void>;
   updateTransaction: (
     id: string,
     input: { category: TransactionCategory; amount: number; date: string; note?: string }
@@ -110,29 +123,201 @@ function summarize(vehicles: Vehicle[], txns: Transaction[]): DashboardSummary {
 
 export function AppDataProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [remoteDashboardToday, setRemoteDashboardToday] = useState<DashboardSummary | null>(null);
+  const [remoteDashboardMonth, setRemoteDashboardMonth] = useState<DashboardSummary | null>(null);
 
-  // "Log in" to the demo account — pre-loaded with sample vehicles/transactions
-  // so the Dashboard/Reports/History screens have something to show.
-  const login = (phone: string) => {
-    setUser({ name: "Rajesh Kumar", phone: phone || "98765 43210" });
-    setVehicles(seedVehicles);
-    setTransactions(seedTransactions);
+  const extractList = (data: any): any[] => {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.items)) return data.items;
+    if (Array.isArray(data?.result)) return data.result;
+    if (Array.isArray(data?.data)) return data.data;
+    if (Array.isArray(data?.value)) return data.value;
+    if (Array.isArray(data?.vehicles)) return data.vehicles;
+    if (Array.isArray(data?.transactions)) return data.transactions;
+    return [];
   };
 
-  // "Create an account" — a brand new account has no vehicles or transactions
-  // yet, and uses whatever name/phone the person actually typed in.
-  const register = (name: string, phone: string) => {
-    setUser({ name: name.trim() || "Driver", phone: phone.trim() || "—" });
+  const normalizeVehicles = (data: any): Vehicle[] => {
+    const list = extractList(data);
+
+    return list
+      .map((item: any) => ({
+        id: item?.id ?? item?.vehicleId ?? String(item?.vehicleNumber ?? ""),
+        vehicleNumber: item?.vehicleNumber ?? item?.number ?? item?.name ?? "",
+        vehicleType: (item?.vehicleType ?? item?.type ?? "Truck") as VehicleType,
+      }))
+      .filter((item: Vehicle) => item.vehicleNumber);
+  };
+
+  const normalizeTransactions = (data: any): Transaction[] => {
+    const list = extractList(data);
+
+    return list
+      .map((item: any) => ({
+        id: item?.id ?? item?.transactionId ?? `${item?.vehicleId ?? "tx"}-${item?.date ?? Date.now()}`,
+        vehicleId: item?.vehicleId ?? item?.vehicle?.id ?? item?.vehicleId ?? "",
+        vehicleNumber: item?.vehicleNumber ?? item?.vehicle?.vehicleNumber ?? "",
+        type: (item?.type ?? "Expense") as TransactionType,
+        category: (item?.category ?? "Other") as TransactionCategory,
+        amount: Number(item?.amount ?? 0),
+        date: item?.date ?? new Date().toISOString(),
+        note: item?.note ?? "",
+      }))
+      .filter((item: Transaction) => item.vehicleId || item.vehicleNumber);
+  };
+
+  const loadUserData = async (token: string) => {
+    try {
+      const [vehicleList, transactionList, todayRes, monthRes] = await Promise.all([
+        getVehicles(token).catch(() => []),
+        getTransactions(token).catch(() => []),
+        getDashboardToday(token).catch(() => null),
+        getDashboardMonth(token).catch(() => null),
+      ]);
+
+      const normalizedVehicles = normalizeVehicles(vehicleList);
+      const normalizedTransactions = normalizeTransactions(transactionList);
+      setVehicles(normalizedVehicles);
+      setTransactions(normalizedTransactions);
+
+      const normSummary = (summary: any): DashboardSummary | null => {
+        if (!summary) return null;
+        const payload = summary?.data && typeof summary.data === "object" && !Array.isArray(summary.data) ? summary.data : summary;
+        const vehicleList = extractList(payload?.vehicles ?? payload?.items ?? payload?.data ?? []);
+        const totalIncome = Number(payload?.totalIncome ?? payload?.income ?? 0);
+        const totalExpense = Number(payload?.totalExpense ?? payload?.expense ?? 0);
+        const totalProfit = Number(payload?.totalProfit ?? payload?.profit ?? totalIncome - totalExpense);
+
+        return {
+          totalIncome,
+          totalExpense,
+          totalProfit,
+          vehicles:
+            vehicleList.map((item: any) => ({
+              vehicleId: item?.vehicleId ?? item?.id ?? "",
+              vehicleNumber: item?.vehicleNumber ?? item?.number ?? item?.name ?? "",
+              vehicleType: normalizedVehicles.find((v) => v.id === (item?.vehicleId ?? item?.id))?.vehicleType ?? "Truck",
+              income: Number(item?.income ?? 0),
+              expense: Number(item?.expense ?? 0),
+              profit: Number(item?.profit ?? (Number(item?.income ?? 0) - Number(item?.expense ?? 0))),
+            })) ?? [],
+        };
+      };
+
+      const mappedToday: DashboardSummary | null = normSummary(todayRes);
+      const mappedMonth: DashboardSummary | null = normSummary(monthRes);
+
+      setRemoteDashboardToday(mappedToday);
+      setRemoteDashboardMonth(mappedMonth);
+    } catch {
+      // Only clear state if all primary data fetches fail. A single dashboard summary error should not wipe real vehicles/transactions.
+    }
+  };
+
+  useEffect(() => {
+    const restoreSession = async () => {
+      const auth = await getAuth();
+      if (!auth?.accessToken || !auth?.user) return;
+
+      setAccessToken(auth.accessToken);
+      setRefreshToken(auth.refreshToken || null);
+      setUser({
+        name: auth.user.name || auth.user.fullName || "User",
+        phone: auth.user.phone || auth.user.mobile || "",
+      });
+      await loadUserData(auth.accessToken);
+    };
+
+    restoreSession();
+  }, []);
+
+  const persistAuth = async (nextAccessToken: string, nextRefreshToken: string, nextUser: any) => {
+    setAccessToken(nextAccessToken);
+    setRefreshToken(nextRefreshToken);
+    setUser({
+      name: nextUser?.name || nextUser?.fullName || "User",
+      phone: nextUser?.phone || nextUser?.mobile || "",
+    });
+
+    await saveAuth({
+      accessToken: nextAccessToken,
+      refreshToken: nextRefreshToken,
+      user: nextUser || null,
+    });
+  };
+
+  const login = async (phone: string, password: string) => {
+    const response = await loginUser(phone.trim(), password);
+    const nextAccessToken = response.accessToken || response.token;
+    const nextRefreshToken = response.refreshToken || "";
+    const nextUser = response.user || {
+      name: response.name || "User",
+      phone: response.phone || phone.trim(),
+    };
+
+    if (!nextAccessToken) {
+      throw new Error(response.message || "Login failed");
+    }
+
+    await persistAuth(nextAccessToken, nextRefreshToken, nextUser);
+    await loadUserData(nextAccessToken);
+  };
+
+  const register = async (name: string, phone: string, password: string) => {
+    const response = await registerUser(name.trim(), phone.trim(), password);
+
+    if (response.message) {
+      throw new Error(response.message);
+    }
+
+    if (response.id || response.name || response.phone) {
+      setUser({
+        name: response.name || name.trim() || "User",
+        phone: response.phone || phone.trim(),
+      });
+    }
+
     setVehicles([]);
     setTransactions([]);
   };
 
-  const logout = () => setUser(null);
+  const logout = async () => {
+    if (refreshToken) {
+      try {
+        await logoutUser(refreshToken);
+      } catch {}
+    }
 
-  const addVehicle = (vehicleNumber: string, vehicleType: VehicleType) =>
+    setUser(null);
+    setAccessToken(null);
+    setRefreshToken(null);
+    setVehicles([]);
+    setTransactions([]);
+    await clearAuth();
+  };
+
+  const addVehicle = async (vehicleNumber: string, vehicleType: VehicleType) => {
+    if (accessToken) {
+      try {
+        const created = await createVehicle(vehicleNumber, vehicleType, accessToken);
+        const normalized: Vehicle = {
+          id: created.id ?? nextId(),
+          vehicleNumber: created.vehicleNumber ?? vehicleNumber,
+          vehicleType: (created.vehicleType ?? vehicleType) as VehicleType,
+        };
+        setVehicles((prev) => [...prev, normalized]);
+        return;
+      } catch {
+        // Fall back to local update if the backend is temporarily unavailable.
+      }
+    }
+
     setVehicles((prev) => [...prev, { id: nextId(), vehicleNumber, vehicleType }]);
+  };
 
   const updateVehicle = (id: string, vehicleNumber: string, vehicleType: VehicleType) =>
     setVehicles((prev) => prev.map((v) => (v.id === id ? { ...v, vehicleNumber, vehicleType } : v)));
@@ -142,7 +327,40 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     setTransactions((prev) => prev.filter((t) => t.vehicleId !== id));
   };
 
-  const addTransaction: AppDataContextValue["addTransaction"] = (input) => {
+  const addTransaction: AppDataContextValue["addTransaction"] = async (input) => {
+    if (accessToken) {
+      try {
+        const created = await createTransaction(
+          {
+            vehicleId: input.vehicleId,
+            type: input.type,
+            category: input.category,
+            amount: input.amount,
+            date: input.date,
+            note: input.note,
+          },
+          accessToken
+        );
+
+        const vehicle = vehicles.find((v) => v.id === input.vehicleId);
+        const normalized: Transaction = {
+          id: created.id ?? nextId(),
+          vehicleId: created.vehicleId ?? input.vehicleId,
+          vehicleNumber: created.vehicleNumber ?? vehicle?.vehicleNumber ?? "",
+          type: (created.type ?? input.type) as TransactionType,
+          category: (created.category ?? input.category) as TransactionCategory,
+          amount: Number(created.amount ?? input.amount ?? 0),
+          date: created.date ?? input.date,
+          note: created.note ?? input.note,
+        };
+
+        setTransactions((prev) => [normalized, ...prev]);
+        return;
+      } catch {
+        // Fall back to local update if backend request fails.
+      }
+    }
+
     const vehicle = vehicles.find((v) => v.id === input.vehicleId);
     setTransactions((prev) => [
       {
@@ -171,17 +389,20 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const removeTransaction = (id: string) => setTransactions((prev) => prev.filter((t) => t.id !== id));
 
   const dashboardToday = useMemo(() => {
+    if (remoteDashboardToday) return remoteDashboardToday;
     const now = new Date();
     return summarize(vehicles, transactions.filter((t) => isSameDay(t.date, now)));
-  }, [vehicles, transactions]);
+  }, [remoteDashboardToday, vehicles, transactions]);
 
   const dashboardMonth = useMemo(() => {
+    if (remoteDashboardMonth) return remoteDashboardMonth;
     const now = new Date();
     return summarize(vehicles, transactions.filter((t) => isSameMonth(t.date, now)));
-  }, [vehicles, transactions]);
+  }, [remoteDashboardMonth, vehicles, transactions]);
 
   const value: AppDataContextValue = {
     user,
+    accessToken,
     login,
     register,
     logout,

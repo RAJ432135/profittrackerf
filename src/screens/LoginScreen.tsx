@@ -24,7 +24,7 @@ export function LoginScreen({ navigation }: any) {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const onSubmit = () => {
+  const onSubmit = async () => {
     setError(null);
     if (phone.trim().length < 6) {
       setError("Enter a valid phone number");
@@ -34,11 +34,15 @@ export function LoginScreen({ navigation }: any) {
       setError("Enter your password");
       return;
     }
+
     setSubmitting(true);
-    setTimeout(() => {
-      login(phone.trim());
+    try {
+      await login(phone.trim(), password);
+    } catch (err: any) {
+      setError(err?.message || "Login failed. Please check your phone number and password.");
+    } finally {
       setSubmitting(false);
-    }, 400);
+    }
   };
 
   return (

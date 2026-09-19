@@ -17,7 +17,7 @@ export function RegisterScreen({ navigation }: any) {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const onSubmit = () => {
+  const onSubmit = async () => {
     setError(null);
     if (!name.trim()) {
       setError("Enter your name");
@@ -31,11 +31,16 @@ export function RegisterScreen({ navigation }: any) {
       setError("Enter a password");
       return;
     }
+
     setSubmitting(true);
-    setTimeout(() => {
-      register(name.trim(), phone.trim());
+    try {
+      await register(name.trim(), phone.trim(), password);
+      navigation.navigate("Login");
+    } catch (err: any) {
+      setError(err?.message || "Registration failed. Please try again.");
+    } finally {
       setSubmitting(false);
-    }, 400);
+    }
   };
 
   return (

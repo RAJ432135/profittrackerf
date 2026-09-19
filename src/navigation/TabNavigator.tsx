@@ -22,8 +22,8 @@ const TAB_ICONS: Record<string, typeof Home> = {
 
 function TabBarBackground() {
   return (
-    <View style={StyleSheet.absoluteFillObject}>
-      <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFillObject} />
+    <View style={StyleSheet.absoluteFill}>
+      <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill} />
       <View style={styles.tabBarTint} />
     </View>
   );
@@ -65,7 +65,7 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   tabBarTint: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(255,255,255,0.5)",
   },
 });

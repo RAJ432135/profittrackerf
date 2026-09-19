@@ -14,7 +14,7 @@ export function GlassCard({
 }) {
   const content = (
     <View style={[styles.card, style]}>
-      <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFillObject} />
+      <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill} />
       <View style={styles.inner}>{children}</View>
     </View>
   );

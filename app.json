@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Vehicle Profit Tracker",
+    "name": "Profit Tracker",
     "slug": "vehicle-profit-tracker-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -8,17 +8,25 @@
     "splash": {
       "backgroundColor": "#bfe4fb"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false
     },
     "android": {
+      "package": "com.shivam.vptmobile",
       "adaptiveIcon": {
         "backgroundColor": "#bfe4fb"
       }
     },
     "web": {
       "bundler": "metro"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "5d974c79-b221-475e-8101-a23acf929b12"
+      }
     }
   }
 }
