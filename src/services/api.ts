@@ -161,6 +161,24 @@ export async function getDashboardToday(token: string) {
   }>("/api/v1/dashboard/today", { method: "GET" }, token);
 }
 
+export async function getDashboardWeek(token: string) {
+  return apiRequest<{
+    period?: string;
+    startDate?: string;
+    endDate?: string;
+    totalIncome?: number;
+    totalExpense?: number;
+    totalProfit?: number;
+    vehicles?: Array<{
+      vehicleId?: string;
+      vehicleNumber?: string;
+      income?: number;
+      expense?: number;
+      profit?: number;
+    }>;
+  }>("/api/v1/dashboard/week", { method: "GET" }, token);
+}
+
 export async function getDashboardMonth(token: string) {
   return apiRequest<{
     totalIncome?: number;
@@ -175,7 +193,65 @@ export async function getDashboardMonth(token: string) {
     }>;
   }>("/api/v1/dashboard/month", { method: "GET" }, token);
 }
+export async function getDashboardLastMonth(token: string) {
+  return apiRequest<{
+    period?: string;
+    startDate?: string;
+    endDate?: string;
+    totalIncome?: number;
+    totalExpense?: number;
+    totalProfit?: number;
+    vehicles?: Array<{
+      vehicleId?: string;
+      vehicleNumber?: string;
+      income?: number;
+      expense?: number;
+      profit?: number;
+    }>;
+  }>("/api/v1/dashboard/last-month", { method: "GET" }, token);
+}
 
+export async function getDashboardYear(token: string, year?: number | string) {
+  const qs = year ? `?year=${encodeURIComponent(String(year))}` : "";
+  return apiRequest<{
+    period?: string;
+    startDate?: string;
+    endDate?: string;
+    totalIncome?: number;
+    totalExpense?: number;
+    totalProfit?: number;
+    vehicles?: Array<{
+      vehicleId?: string;
+      vehicleNumber?: string;
+      income?: number;
+      expense?: number;
+      profit?: number;
+    }>;
+  }>(`/api/v1/dashboard/year${qs}`, { method: "GET" }, token);
+}
+
+export async function getDashboardRange(token: string, fromDate: string, toDate: string) {
+  const params = new URLSearchParams({
+    fromDate,
+    toDate,
+  });
+
+  return apiRequest<{
+    period?: string;
+    startDate?: string;
+    endDate?: string;
+    totalIncome?: number;
+    totalExpense?: number;
+    totalProfit?: number;
+    vehicles?: Array<{
+      vehicleId?: string;
+      vehicleNumber?: string;
+      income?: number;
+      expense?: number;
+      profit?: number;
+    }>;
+  }>(`/api/v1/dashboard/range?${params.toString()}`, { method: "GET" }, token);
+}
 export async function getProfile(token: string) {
   return apiRequest<any>("/api/v1/profile", { method: "GET" }, token);
 }

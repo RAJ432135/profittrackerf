@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { ChevronDown, ChevronUp } from "lucide-react-native";
 import { AppShell } from "../components/AppShell";
@@ -6,6 +6,7 @@ import { GlassCard } from "../components/GlassCard";
 import { GhostButton } from "../components/GhostButton";
 import { Input } from "../components/Input";
 import { useAppData } from "../context/AppDataContext";
+import { getDashboardLastMonth, getDashboardRange, getDashboardWeek, getDashboardYear } from "../services/api";
 import { colors, rupee } from "../theme/theme";
 import { CATEGORY_LABELS, type TransactionCategory } from "../types/domain";
 import { inRange, PERIOD_LABELS, resolvePeriod, totalsFor, type PeriodKey } from "../utils/dateRanges";
@@ -13,11 +14,76 @@ import { inRange, PERIOD_LABELS, resolvePeriod, totalsFor, type PeriodKey } from
 const PERIODS: PeriodKey[] = ["today", "week", "month", "lastMonth", "year", "custom"];
 
 export function ReportsScreen() {
-  const { vehicles, transactions } = useAppData();
+  const { vehicles, transactions, accessToken } = useAppData();
   const [period, setPeriod] = useState<PeriodKey>("month");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [expandedVehicle, setExpandedVehicle] = useState<string | null>(null);
+  const [apiSummary, setApiSummary] = useState<{
+    totalIncome: number;
+    totalExpense: number;
+    totalProfit: number;
+    vehicles: Array<{
+      vehicleId: string;
+      vehicleNumber: string;
+      income: number;
+      expense: number;
+      profit: number;
+    }>;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!accessToken) {
+      setApiSummary(null);
+      return;
+    }
+
+    const shouldUseApi = period === "week" || period === "lastMonth" || period === "year" || (period === "custom" && customFrom && customTo);
+    if (!shouldUseApi) {
+      setApiSummary(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadSummary = async () => {
+      try {
+        let summary: any = null;
+
+        if (period === "week") {
+          summary = await getDashboardWeek(accessToken);
+        } else if (period === "lastMonth") {
+          summary = await getDashboardLastMonth(accessToken);
+        } else if (period === "year") {
+          summary = await getDashboardYear(accessToken, new Date().getFullYear());
+        } else if (period === "custom") {
+          summary = await getDashboardRange(accessToken, customFrom, customTo);
+        }
+
+        if (!cancelled && summary) {
+          setApiSummary({
+            totalIncome: Number(summary.totalIncome ?? 0),
+            totalExpense: Number(summary.totalExpense ?? 0),
+            totalProfit: Number(summary.totalProfit ?? 0),
+            vehicles: (summary.vehicles ?? []).map((v: any) => ({
+              vehicleId: v.vehicleId ?? v.id ?? "",
+              vehicleNumber: v.vehicleNumber ?? v.number ?? v.name ?? "",
+              income: Number(v.income ?? 0),
+              expense: Number(v.expense ?? 0),
+              profit: Number(v.profit ?? (Number(v.income ?? 0) - Number(v.expense ?? 0))),
+            })),
+          });
+        }
+      } catch {
+        if (!cancelled) setApiSummary(null);
+      }
+    };
+
+    loadSummary();
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, period, customFrom, customTo]);
 
   const range = useMemo(() => resolvePeriod(period, customFrom, customTo), [period, customFrom, customTo]);
 
@@ -26,20 +92,48 @@ export function ReportsScreen() {
     [transactions, range]
   );
 
-  const totals = useMemo(() => totalsFor(filtered), [filtered]);
+  const totals = useMemo(() => {
+    if (apiSummary) {
+      return {
+        income: apiSummary.totalIncome,
+        expense: apiSummary.totalExpense,
+        profit: apiSummary.totalProfit,
+        tripCount: 0,
+        transactionCount: 0,
+      };
+    }
+
+    return totalsFor(filtered);
+  }, [apiSummary, filtered]);
 
   const expenseCategories = useMemo(() => {
+    if (apiSummary) {
+      return {} as Partial<Record<TransactionCategory, number>>;
+    }
+
     const map: Partial<Record<TransactionCategory, number>> = {};
     filtered.filter((t) => t.type === "Expense").forEach((t) => (map[t.category] = (map[t.category] ?? 0) + t.amount));
     return map;
-  }, [filtered]);
+  }, [apiSummary, filtered]);
 
-  const tripIncome = useMemo(
-    () => filtered.filter((t) => t.type === "Income" && t.category === "Trip").reduce((s, t) => s + t.amount, 0),
-    [filtered]
-  );
+  const tripIncome = useMemo(() => {
+    if (apiSummary) return 0;
+    return filtered.filter((t) => t.type === "Income" && t.category === "Trip").reduce((s, t) => s + t.amount, 0);
+  }, [apiSummary, filtered]);
 
   const vehicleAgg = useMemo(() => {
+    if (apiSummary) {
+      return apiSummary.vehicles.map((v) => ({
+        vehicleId: v.vehicleId,
+        vehicleNumber: v.vehicleNumber,
+        income: v.income,
+        expense: v.expense,
+        profit: v.profit,
+        categories: {} as Record<string, number>,
+        tripCount: 0,
+      }));
+    }
+
     return vehicles
       .map((v) => {
         const txns = filtered.filter((t) => t.vehicleId === v.id);
@@ -51,7 +145,7 @@ export function ReportsScreen() {
         return { vehicleId: v.id, vehicleNumber: v.vehicleNumber, income, expense, profit: income - expense, categories, tripCount };
       })
       .filter((v) => v.income > 0 || v.expense > 0);
-  }, [vehicles, filtered]);
+  }, [apiSummary, vehicles, filtered]);
 
   return (
     <AppShell>
@@ -101,12 +195,12 @@ export function ReportsScreen() {
         <Text style={styles.sectionTitle}>Expense breakdown</Text>
         <GlassCard style={styles.breakdownCard}>
           {Object.keys(expenseCategories).length === 0 && <Text style={styles.faint}>No expenses in this period.</Text>}
-          {Object.entries(expenseCategories)
-            .sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0))
+          {(Object.entries(expenseCategories) as Array<[string, number]> )
+            .sort((a, b) => b[1] - a[1])
             .map(([cat, amount]) => (
               <View key={cat} style={styles.breakdownRow}>
                 <Text style={styles.breakdownLabel}>{CATEGORY_LABELS[cat as TransactionCategory]}</Text>
-                <Text style={[styles.breakdownValue, { color: colors.expense }]}>{rupee(amount ?? 0)}</Text>
+                <Text style={[styles.breakdownValue, { color: colors.expense }]}>{rupee(amount)}</Text>
               </View>
             ))}
           {tripIncome > 0 && (
@@ -139,12 +233,12 @@ export function ReportsScreen() {
                 {expanded && (
                   <View style={styles.expandedBlock}>
                     <Text style={styles.expandedTitle}>By category</Text>
-                    {Object.entries(v.categories)
-                      .sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0))
+                    {(Object.entries(v.categories as Record<string, number>) as Array<[string, number]>)
+                      .sort((a, b) => b[1] - a[1])
                       .map(([cat, amount]) => (
                         <View key={cat} style={styles.categoryRow}>
                           <Text style={styles.categoryLabel}>{CATEGORY_LABELS[cat as TransactionCategory]}</Text>
-                          <Text style={styles.categoryValue}>{rupee(amount ?? 0)}</Text>
+                          <Text style={styles.categoryValue}>{rupee(amount)}</Text>
                         </View>
                       ))}
                   </View>
