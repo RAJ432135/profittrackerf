@@ -325,6 +325,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const removeVehicle = (id: string) => {
     setVehicles((prev) => prev.filter((v) => v.id !== id));
     setTransactions((prev) => prev.filter((t) => t.vehicleId !== id));
+    setRemoteDashboardToday(null);
+    setRemoteDashboardMonth(null);
   };
 
   const addTransaction: AppDataContextValue["addTransaction"] = async (input) => {
@@ -355,6 +357,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         };
 
         setTransactions((prev) => [normalized, ...prev]);
+        setRemoteDashboardToday(null);
+        setRemoteDashboardMonth(null);
         return;
       } catch {
         // Fall back to local update if backend request fails.
@@ -375,9 +379,11 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       },
       ...prev,
     ]);
+    setRemoteDashboardToday(null);
+    setRemoteDashboardMonth(null);
   };
 
-  const updateTransaction: AppDataContextValue["updateTransaction"] = (id, input) =>
+  const updateTransaction: AppDataContextValue["updateTransaction"] = (id, input) => {
     setTransactions((prev) =>
       prev.map((t) =>
         t.id === id
@@ -385,8 +391,15 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           : t
       )
     );
+    setRemoteDashboardToday(null);
+    setRemoteDashboardMonth(null);
+  };
 
-  const removeTransaction = (id: string) => setTransactions((prev) => prev.filter((t) => t.id !== id));
+  const removeTransaction = (id: string) => {
+    setTransactions((prev) => prev.filter((t) => t.id !== id));
+    setRemoteDashboardToday(null);
+    setRemoteDashboardMonth(null);
+  };
 
   const dashboardToday = useMemo(() => {
     if (remoteDashboardToday) return remoteDashboardToday;
