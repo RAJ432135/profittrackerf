@@ -12,13 +12,21 @@ import { clearAuth, getAuth, saveAuth } from "../utils/storage";
 import {
   createTransaction,
   createVehicle,
+  deleteTransaction as apiDeleteTransaction,
+  deleteVehicle as apiDeleteVehicle,
+  forgotPassword as apiForgotPassword,
   getDashboardMonth,
   getDashboardToday,
   getTransactions,
   getVehicles,
   loginUser,
   logoutUser,
+  refreshAccessToken,
   registerUser,
+  resetPassword as apiResetPassword,
+  setUnauthorizedHandler,
+  updateTransaction as apiUpdateTransaction,
+  updateVehicle as apiUpdateVehicle,
 } from "../services/api";
 
 let idSeed = 100;
@@ -55,8 +63,8 @@ interface AppDataContextValue {
 
   vehicles: Vehicle[];
   addVehicle: (vehicleNumber: string, vehicleType: VehicleType) => Promise<void>;
-  updateVehicle: (id: string, vehicleNumber: string, vehicleType: VehicleType) => void;
-  removeVehicle: (id: string) => void;
+  updateVehicle: (id: string, vehicleNumber: string, vehicleType: VehicleType) => Promise<void>;
+  removeVehicle: (id: string) => Promise<void>;
 
   transactions: Transaction[];
   addTransaction: (input: {
@@ -70,11 +78,14 @@ interface AppDataContextValue {
   updateTransaction: (
     id: string,
     input: { category: TransactionCategory; amount: number; date: string; note?: string }
-  ) => void;
-  removeTransaction: (id: string) => void;
+  ) => Promise<void>;
+  removeTransaction: (id: string) => Promise<void>;
 
   dashboardToday: DashboardSummary;
   dashboardMonth: DashboardSummary;
+
+  forgotPassword: (phone: string) => Promise<void>;
+  resetPassword: (phone: string, token: string, newPassword: string) => Promise<void>;
 }
 
 const AppDataContext = createContext<AppDataContextValue | null>(null);
@@ -235,6 +246,53 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     restoreSession();
   }, []);
 
+  // Keep a ref in sync with the latest refreshToken so the unauthorized-handler
+  // (registered once below) always reads the current value, not a stale closure.
+  const refreshTokenRef = React.useRef<string | null>(null);
+  useEffect(() => {
+    refreshTokenRef.current = refreshToken;
+  }, [refreshToken]);
+
+  useEffect(() => {
+    // Called by api.ts whenever any authenticated request gets a 401.
+    // Tries to silently get a new access token using the stored refresh token.
+    // Returns the new token on success (so the failed request can be retried),
+    // or null on failure (so the caller logs the user out instead).
+    setUnauthorizedHandler(async () => {
+      const currentRefreshToken = refreshTokenRef.current;
+      if (!currentRefreshToken) return null;
+
+      try {
+        const response = await refreshAccessToken(currentRefreshToken);
+        const newAccessToken = response.accessToken || response.token;
+        const newRefreshToken = response.refreshToken || currentRefreshToken;
+        if (!newAccessToken) return null;
+
+        setAccessToken(newAccessToken);
+        setRefreshToken(newRefreshToken);
+        const auth = await getAuth();
+        await saveAuth({
+          accessToken: newAccessToken,
+          refreshToken: newRefreshToken,
+          user: auth?.user || null,
+        });
+        return newAccessToken;
+      } catch {
+        // Refresh token itself is invalid/expired — log the user out cleanly
+        // rather than leaving them in a half-authenticated state.
+        setUser(null);
+        setAccessToken(null);
+        setRefreshToken(null);
+        setVehicles([]);
+        setTransactions([]);
+        await clearAuth();
+        return null;
+      }
+    });
+
+    return () => setUnauthorizedHandler(null);
+  }, []);
+
   const persistAuth = async (nextAccessToken: string, nextRefreshToken: string, nextUser: any) => {
     setAccessToken(nextAccessToken);
     setRefreshToken(nextRefreshToken);
@@ -319,10 +377,26 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     setVehicles((prev) => [...prev, { id: nextId(), vehicleNumber, vehicleType }]);
   };
 
-  const updateVehicle = (id: string, vehicleNumber: string, vehicleType: VehicleType) =>
+  const updateVehicle = async (id: string, vehicleNumber: string, vehicleType: VehicleType) => {
+    if (accessToken) {
+      try {
+        await apiUpdateVehicle(id, vehicleNumber, vehicleType, accessToken);
+      } catch {
+        // Fall back to local-only update if the backend call fails; the next
+        // successful sync from the server will reconcile the real state.
+      }
+    }
     setVehicles((prev) => prev.map((v) => (v.id === id ? { ...v, vehicleNumber, vehicleType } : v)));
+  };
 
-  const removeVehicle = (id: string) => {
+  const removeVehicle = async (id: string) => {
+    if (accessToken) {
+      try {
+        await apiDeleteVehicle(id, accessToken);
+      } catch {
+        // Fall back to local-only removal if the backend call fails.
+      }
+    }
     setVehicles((prev) => prev.filter((v) => v.id !== id));
     setTransactions((prev) => prev.filter((t) => t.vehicleId !== id));
     setRemoteDashboardToday(null);
@@ -383,7 +457,25 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     setRemoteDashboardMonth(null);
   };
 
-  const updateTransaction: AppDataContextValue["updateTransaction"] = (id, input) => {
+  const updateTransaction: AppDataContextValue["updateTransaction"] = async (id, input) => {
+    if (accessToken) {
+      try {
+        const existing = transactions.find((t) => t.id === id);
+        await apiUpdateTransaction(
+          id,
+          {
+            type: existing?.type ?? "Expense",
+            category: input.category,
+            amount: input.amount,
+            date: input.date,
+            note: input.note,
+          },
+          accessToken
+        );
+      } catch {
+        // Fall back to local-only update if the backend call fails.
+      }
+    }
     setTransactions((prev) =>
       prev.map((t) =>
         t.id === id
@@ -395,10 +487,28 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     setRemoteDashboardMonth(null);
   };
 
-  const removeTransaction = (id: string) => {
+  const removeTransaction = async (id: string) => {
+    if (accessToken) {
+      try {
+        await apiDeleteTransaction(id, accessToken);
+      } catch {
+        // Fall back to local-only removal if the backend call fails.
+      }
+    }
     setTransactions((prev) => prev.filter((t) => t.id !== id));
     setRemoteDashboardToday(null);
     setRemoteDashboardMonth(null);
+  };
+
+  const forgotPassword = async (phone: string) => {
+    // apiRequest throws automatically on a non-2xx response, so reaching this
+    // line means the backend accepted the request and (if the phone is
+    // registered) queued a reset code.
+    await apiForgotPassword(phone.trim());
+  };
+
+  const resetPassword = async (phone: string, token: string, newPassword: string) => {
+    await apiResetPassword(phone.trim(), token.trim(), newPassword);
   };
 
   const dashboardToday = useMemo(() => {
@@ -429,6 +539,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     removeTransaction,
     dashboardToday,
     dashboardMonth,
+    forgotPassword,
+    resetPassword,
   };
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;

@@ -12,6 +12,14 @@ function getJsonBody(response: Response) {
   return response.text().catch(() => "");
 }
 
+// Allows AppDataContext to plug in a refresh handler without api.ts needing
+// to know about React state, SecureStore, or the shape of stored auth.
+// Set once, at app startup, from AppDataContext.
+let onUnauthorized: (() => Promise<string | null>) | null = null;
+export function setUnauthorizedHandler(handler: (() => Promise<string | null>) | null) {
+  onUnauthorized = handler;
+}
+
 export async function apiRequest<T = any>(path: string, options: RequestInit = {}, token?: string): Promise<T> {
   const headers = {
     "Content-Type": "application/json",
@@ -26,6 +34,24 @@ export async function apiRequest<T = any>(path: string, options: RequestInit = {
     ...options,
     headers,
   });
+
+  // Don't try to refresh on the auth endpoints themselves — a 401 there means
+  // the credentials/refresh token are actually invalid, not merely expired.
+  const isAuthEndpoint = path.includes("/auth/login") || path.includes("/auth/refresh") || path.includes("/auth/register");
+
+  if (response.status === 401 && token && onUnauthorized && !isAuthEndpoint) {
+    const newToken = await onUnauthorized();
+    if (newToken) {
+      const retryHeaders = { ...headers, Authorization: `Bearer ${newToken}` };
+      const retryResponse = await fetch(buildUrl(path), { ...options, headers: retryHeaders });
+      const retryData = await getJsonBody(retryResponse);
+      if (!retryResponse.ok) {
+        const message = typeof retryData === "string" ? retryData : retryData?.message || retryData?.error || "Request failed";
+        throw new Error(message || "Request failed");
+      }
+      return retryData as T;
+    }
+  }
 
   const data = await getJsonBody(response);
 
@@ -87,6 +113,26 @@ export async function refreshAccessToken(refreshToken: string) {
   );
 }
 
+export async function forgotPassword(phone: string) {
+  return apiRequest<{ message?: string }>(
+    "/api/v1/auth/forgot-password",
+    {
+      method: "POST",
+      body: JSON.stringify({ phone }),
+    }
+  );
+}
+
+export async function resetPassword(phone: string, token: string, newPassword: string) {
+  return apiRequest<{ message?: string }>(
+    "/api/v1/auth/reset-password",
+    {
+      method: "POST",
+      body: JSON.stringify({ phone, token, newPassword }),
+    }
+  );
+}
+
 export async function logoutUser(refreshToken: string) {
   return apiRequest<{ message?: string }>(
     "/api/v1/auth/logout",
@@ -110,6 +156,21 @@ export async function createVehicle(vehicleNumber: string, vehicleType: string, 
 
 export async function getVehicles(token: string) {
   return apiRequest<any[]>("/api/v1/vehicles", { method: "GET" }, token);
+}
+
+export async function updateVehicle(id: string, vehicleNumber: string, vehicleType: string, token: string) {
+  return apiRequest<{ id?: string; vehicleNumber?: string; vehicleType?: string }>(
+    `/api/v1/vehicles/${id}`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ vehicleNumber, vehicleType }),
+    },
+    token
+  );
+}
+
+export async function deleteVehicle(id: string, token: string) {
+  return apiRequest<void>(`/api/v1/vehicles/${id}`, { method: "DELETE" }, token);
 }
 
 export async function createTransaction(
@@ -144,6 +205,34 @@ export async function createTransaction(
 
 export async function getTransactions(token: string) {
   return apiRequest<any[]>("/api/v1/transactions", { method: "GET" }, token);
+}
+
+export async function updateTransaction(
+  id: string,
+  payload: { type: string; category: string; amount: number; date: string; note?: string },
+  token: string
+) {
+  return apiRequest<{
+    id?: string;
+    vehicleId?: string;
+    vehicleNumber?: string;
+    type?: string;
+    category?: string;
+    amount?: number;
+    date?: string;
+    note?: string;
+  }>(
+    `/api/v1/transactions/${id}`,
+    {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    },
+    token
+  );
+}
+
+export async function deleteTransaction(id: string, token: string) {
+  return apiRequest<void>(`/api/v1/transactions/${id}`, { method: "DELETE" }, token);
 }
 
 export async function getDashboardToday(token: string) {
