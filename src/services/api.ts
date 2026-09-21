@@ -344,3 +344,16 @@ export async function getDashboardRange(token: string, fromDate: string, toDate:
 export async function getProfile(token: string) {
   return apiRequest<any>("/api/v1/profile", { method: "GET" }, token);
 }
+
+export async function trackEvent(
+  name: "app_open" | "vehicle_created" | "transaction_created" | "report_viewed",
+  token: string,
+  platform: string,
+  appVersion = "1.0.0"
+) {
+  return apiRequest<void>(
+    "/api/v1/events",
+    { method: "POST", body: JSON.stringify({ name, platform, appVersion }) },
+    token
+  );
+}

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Platform } from "react-native";
 import type {
   DashboardSummary,
   Transaction,
@@ -27,6 +28,7 @@ import {
   setUnauthorizedHandler,
   updateTransaction as apiUpdateTransaction,
   updateVehicle as apiUpdateVehicle,
+  trackEvent,
 } from "../services/api";
 
 let idSeed = 100;
@@ -86,6 +88,10 @@ interface AppDataContextValue {
 
   forgotPassword: (phone: string) => Promise<void>;
   resetPassword: (phone: string, token: string, newPassword: string) => Promise<void>;
+
+  // Fires a lightweight analytics event (see EventsController on the backend).
+  // Safe to call from any screen; no-ops silently if there is no access token yet.
+  recordEvent: (name: "app_open" | "vehicle_created" | "transaction_created" | "report_viewed") => void;
 }
 
 const AppDataContext = createContext<AppDataContextValue | null>(null);
@@ -140,6 +146,17 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [remoteDashboardToday, setRemoteDashboardToday] = useState<DashboardSummary | null>(null);
   const [remoteDashboardMonth, setRemoteDashboardMonth] = useState<DashboardSummary | null>(null);
+  // Internal: used where we already have a just-issued token in hand but
+  // React state (accessToken) has not re-rendered yet (login, restoreSession).
+  const recordEventWithToken = (name: "app_open" | "vehicle_created" | "transaction_created" | "report_viewed", token: string) =>
+    trackEvent(name, token, Platform.OS).catch(() => undefined);
+
+  // Public: exposed on the context so any screen can fire an event using
+  // whatever accessToken is currently in state. No-ops if not logged in yet.
+  const recordEvent = (name: "app_open" | "vehicle_created" | "transaction_created" | "report_viewed") => {
+    if (!accessToken) return;
+    recordEventWithToken(name, accessToken);
+  };
 
   const extractList = (data: any): any[] => {
     if (Array.isArray(data)) return data;
@@ -241,6 +258,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         phone: auth.user.phone || auth.user.mobile || "",
       });
       await loadUserData(auth.accessToken);
+      recordEventWithToken("app_open", auth.accessToken);
     };
 
     restoreSession();
@@ -323,6 +341,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
     await persistAuth(nextAccessToken, nextRefreshToken, nextUser);
     await loadUserData(nextAccessToken);
+    recordEventWithToken("app_open", nextAccessToken);
   };
 
   const register = async (name: string, phone: string, password: string) => {
@@ -368,6 +387,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           vehicleType: (created.vehicleType ?? vehicleType) as VehicleType,
         };
         setVehicles((prev) => [...prev, normalized]);
+        recordEventWithToken("vehicle_created", accessToken);
         return;
       } catch {
         // Fall back to local update if the backend is temporarily unavailable.
@@ -431,6 +451,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         };
 
         setTransactions((prev) => [normalized, ...prev]);
+        recordEventWithToken("transaction_created", accessToken);
         setRemoteDashboardToday(null);
         setRemoteDashboardMonth(null);
         return;
@@ -541,6 +562,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     dashboardMonth,
     forgotPassword,
     resetPassword,
+    recordEvent,
   };
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;

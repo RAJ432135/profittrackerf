@@ -14,7 +14,7 @@ import { inRange, PERIOD_LABELS, resolvePeriod, totalsFor, type PeriodKey } from
 const PERIODS: PeriodKey[] = ["today", "week", "month", "lastMonth", "year", "custom"];
 
 export function ReportsScreen() {
-  const { vehicles, transactions, accessToken } = useAppData();
+  const { vehicles, transactions, accessToken, recordEvent } = useAppData();
   const [period, setPeriod] = useState<PeriodKey>("month");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
@@ -31,6 +31,13 @@ export function ReportsScreen() {
       profit: number;
     }>;
   } | null>(null);
+
+  // Fire once per screen visit, not once per period-tab switch — that's why this
+  // is its own effect with an empty dependency array rather than folded into
+  // the data-fetching effect below.
+  useEffect(() => {
+    recordEvent("report_viewed");
+  }, []);
 
   useEffect(() => {
     if (!accessToken) {
