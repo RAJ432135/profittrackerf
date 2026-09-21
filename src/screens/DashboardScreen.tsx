@@ -30,6 +30,7 @@ export function DashboardScreen({ navigation }: any) {
         </View>
 
         <GlassCard style={styles.heroCard}>
+          <View style={styles.livePill}><View style={styles.liveDot} /><Text style={styles.liveText}>LIVE TODAY</Text></View>
           <Text style={styles.heroLabel}>Today's profit</Text>
           <Text style={styles.heroAmount}>{rupee(dashboardToday.totalProfit)}</Text>
         </GlassCard>
@@ -82,8 +83,11 @@ const styles = StyleSheet.create({
   faint: { fontSize: 12.5, color: colors.textFaint },
   name: { fontSize: 17, fontWeight: "700", color: colors.text },
   headerIcons: { flexDirection: "row", alignItems: "center", gap: 4 },
-  iconBtn: { padding: 8 },
-  heroCard: { paddingHorizontal: 22, paddingVertical: 24, marginBottom: 20, alignItems: "center" },
+  iconBtn: { padding: 9, borderRadius: 12, borderWidth: 1, borderColor: colors.glassBorder, backgroundColor: colors.ghostBg },
+  heroCard: { paddingHorizontal: 22, paddingVertical: 24, marginBottom: 20, alignItems: "center", borderColor: "rgba(200,255,61,0.28)", backgroundColor: "rgba(24,38,37,0.92)" },
+  livePill: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 11, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 999, backgroundColor: colors.glowFaint },
+  liveDot: { width: 6, height: 6, borderRadius: 999, backgroundColor: colors.glow },
+  liveText: { fontSize: 10, fontWeight: "800", letterSpacing: 1.1, color: colors.glow },
   heroLabel: { marginBottom: 8, fontSize: 13, color: colors.textMuted },
   heroAmount: { fontSize: 44, fontWeight: "700", color: colors.text, letterSpacing: -1 },
   addBtn: { marginBottom: 24 },

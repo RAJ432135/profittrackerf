@@ -4,6 +4,7 @@ import { Fuel, Landmark, UserRound, Wrench, UtensilsCrossed, MoreHorizontal, Sho
 import { AppShell } from "../components/AppShell";
 import { GhostButton } from "../components/GhostButton";
 import { Input } from "../components/Input";
+import { DatePickerField } from "../components/DateRangePicker";
 import { Button } from "../components/Button";
 import { useAppData } from "../context/AppDataContext";
 import { colors, rupee } from "../theme/theme";
@@ -125,7 +126,7 @@ export function AddTransactionScreen({ navigation }: any) {
           placeholder="0"
         />
 
-        <Input label="Date (YYYY-MM-DD)" value={date} onChangeText={setDate} placeholder={todayISO()} />
+        <DatePickerField label="Transaction date" value={date} onChange={setDate} />
 
         <Input label="Note (optional)" placeholder="e.g. Patna trip" value={note} onChangeText={setNote} />
 

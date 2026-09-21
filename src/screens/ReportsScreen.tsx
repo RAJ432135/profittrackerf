@@ -4,7 +4,7 @@ import { ChevronDown, ChevronUp } from "lucide-react-native";
 import { AppShell } from "../components/AppShell";
 import { GlassCard } from "../components/GlassCard";
 import { GhostButton } from "../components/GhostButton";
-import { Input } from "../components/Input";
+import { DateRangePicker } from "../components/DateRangePicker";
 import { useAppData } from "../context/AppDataContext";
 import { getDashboardLastMonth, getDashboardRange, getDashboardWeek, getDashboardYear } from "../services/api";
 import { colors, rupee } from "../theme/theme";
@@ -170,10 +170,7 @@ export function ReportsScreen() {
         </ScrollView>
 
         {period === "custom" && (
-          <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
-            <Input containerStyle={{ flex: 1 }} label="From (YYYY-MM-DD)" value={customFrom} onChangeText={setCustomFrom} placeholder="2026-01-01" />
-            <Input containerStyle={{ flex: 1 }} label="To (YYYY-MM-DD)" value={customTo} onChangeText={setCustomTo} placeholder="2026-12-31" />
-          </View>
+          <DateRangePicker from={customFrom} to={customTo} onChange={(from, to) => { setCustomFrom(from); setCustomTo(to); }} />
         )}
 
         <GlassCard style={styles.headlineCard}>

@@ -14,7 +14,7 @@ export function GlassCard({
 }) {
   const content = (
     <View style={[styles.card, style]}>
-      <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill} />
+      <BlurView intensity={28} tint="dark" style={StyleSheet.absoluteFill} />
       <View style={styles.inner}>{children}</View>
     </View>
   );
@@ -35,6 +35,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.glassBorder,
     backgroundColor: colors.glass,
+    shadowColor: "#000",
+    shadowOpacity: 0.22,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 3,
     overflow: "hidden",
   },
   inner: {

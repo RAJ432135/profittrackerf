@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "splash": {
-      "backgroundColor": "#bfe4fb"
+      "backgroundColor": "#080B10"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -17,7 +17,7 @@
     "android": {
       "package": "com.shivam.vptmobile",
       "adaptiveIcon": {
-        "backgroundColor": "#bfe4fb"
+        "backgroundColor": "#080B10"
       }
     },
     "web": {
@@ -27,6 +27,9 @@
       "eas": {
         "projectId": "5d974c79-b221-475e-8101-a23acf929b12"
       }
-    }
+    },
+    "plugins": [
+      "@react-native-community/datetimepicker"
+    ]
   }
 }

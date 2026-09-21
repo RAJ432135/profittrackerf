@@ -69,14 +69,14 @@ export function Button({ children, onPress, variant = "primary", size = "md", is
 
 const styles = StyleSheet.create({
   gradientShape: {
-    borderRadius: 16,
+    borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
   },
   secondary: {
     borderWidth: 1,
     borderColor: colors.glassBorder,
-    backgroundColor: "transparent",
+    backgroundColor: colors.ghostBg,
   },
   ghostVariant: {
     backgroundColor: "transparent",

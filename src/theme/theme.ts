@@ -3,31 +3,31 @@
  * Light sky-blue gradient background, frosted glass cards, amber accent.
  */
 export const colors = {
-  navyTop: "#bfe4fb",
-  navyBottom: "#7fc8f5",
-  navyCard: "#eaf6ff",
+  navyTop: "#080B10",
+  navyBottom: "#111925",
+  navyCard: "#121A26",
 
-  glow: "#ffb454",
-  glowDark: "#ff8a5b",
-  glowSoft: "rgba(255, 180, 84, 0.35)",
-  glowFaint: "rgba(255, 180, 84, 0.14)",
+  glow: "#C8FF3D",
+  glowDark: "#66E58B",
+  glowSoft: "rgba(200, 255, 61, 0.32)",
+  glowFaint: "rgba(200, 255, 61, 0.12)",
 
-  income: "#059669",
-  expense: "#e11d48",
-  incomeSoft: "rgba(5, 150, 105, 0.14)",
-  expenseSoft: "rgba(225, 29, 72, 0.14)",
+  income: "#54E6A5",
+  expense: "#FF6B85",
+  incomeSoft: "rgba(84, 230, 165, 0.14)",
+  expenseSoft: "rgba(255, 107, 133, 0.14)",
 
-  glass: "rgba(255, 255, 255, 0.55)",
-  glassStrong: "rgba(255, 255, 255, 0.75)",
-  glassBorder: "rgba(10, 14, 31, 0.1)",
-  ghostBg: "rgba(0, 0, 0, 0.04)",
+  glass: "rgba(20, 30, 44, 0.84)",
+  glassStrong: "rgba(27, 39, 55, 0.96)",
+  glassBorder: "rgba(206, 226, 245, 0.12)",
+  ghostBg: "rgba(255, 255, 255, 0.055)",
 
-  text: "#0a0e1f",
-  textMuted: "rgba(10, 14, 31, 0.62)",
-  textFaint: "rgba(10, 14, 31, 0.42)",
+  text: "#F4F8FC",
+  textMuted: "rgba(232, 240, 248, 0.70)",
+  textFaint: "rgba(232, 240, 248, 0.45)",
 
-  onGlow: "#171008",
-  white: "#ffffff",
+  onGlow: "#101707",
+  white: "#F4F8FC",
 };
 
 export const gradientHeadlight = [colors.glow, colors.glowDark] as const;
@@ -41,10 +41,10 @@ export const fonts = {
 };
 
 export const radii = {
-  card: 18,
-  sheet: 24,
+  card: 20,
+  sheet: 28,
   pill: 999,
-  input: 12,
+  input: 14,
   icon: 11,
 };
 

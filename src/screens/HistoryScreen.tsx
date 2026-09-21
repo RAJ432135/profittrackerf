@@ -6,6 +6,7 @@ import { GlassCard } from "../components/GlassCard";
 import { GhostButton } from "../components/GhostButton";
 import { Input } from "../components/Input";
 import { Button } from "../components/Button";
+import { DatePickerField, DateRangePicker } from "../components/DateRangePicker";
 import { useAppData } from "../context/AppDataContext";
 import { colors, rupee } from "../theme/theme";
 import {
@@ -109,10 +110,7 @@ export function HistoryScreen() {
         </ScrollView>
 
         {period === "custom" && (
-          <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
-            <Input containerStyle={{ flex: 1 }} label="From (YYYY-MM-DD)" value={customFrom} onChangeText={setCustomFrom} placeholder="2026-01-01" />
-            <Input containerStyle={{ flex: 1 }} label="To (YYYY-MM-DD)" value={customTo} onChangeText={setCustomTo} placeholder="2026-12-31" />
-          </View>
+          <DateRangePicker from={customFrom} to={customTo} onChange={(from, to) => { setCustomFrom(from); setCustomTo(to); }} />
         )}
 
         {showFilters && (
@@ -235,7 +233,7 @@ export function HistoryScreen() {
               onChangeText={setEditAmount}
               keyboardType="decimal-pad"
             />
-            <Input label="Date (YYYY-MM-DD)" value={editDate} onChangeText={setEditDate} />
+            <DatePickerField label="Transaction date" value={editDate} onChange={setEditDate} />
             <Input label="Note (optional)" value={editNote} onChangeText={setEditNote} />
 
             <Button size="lg" onPress={handleSaveEdit} style={{ marginTop: 8 }}>

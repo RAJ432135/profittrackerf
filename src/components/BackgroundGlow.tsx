@@ -12,11 +12,11 @@ export function BackgroundGlow() {
     <LinearGradient colors={gradientBackground} style={StyleSheet.absoluteFill}>
       <View
         pointerEvents="none"
-        style={[styles.blob, { top: -96, left: -96, width: 320, height: 320, backgroundColor: colors.glow, opacity: 0.14 }]}
+        style={[styles.blob, { top: -110, left: -112, width: 340, height: 340, backgroundColor: colors.glow, opacity: 0.12 }]}
       />
       <View
         pointerEvents="none"
-        style={[styles.blob, { bottom: -120, right: -96, width: 360, height: 360, backgroundColor: "#3B82F6", opacity: 0.12 }]}
+        style={[styles.blob, { bottom: -130, right: -110, width: 380, height: 380, backgroundColor: "#477DFF", opacity: 0.18 }]}
       />
     </LinearGradient>
   );
